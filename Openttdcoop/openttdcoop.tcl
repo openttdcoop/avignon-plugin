@@ -19,8 +19,18 @@
 package provide AvignonPluginOpenttdcoop 0.1
 
 namespace eval ::ap::plugins::Openttdcoop {
+	::msgcat::mcmset {} {
+		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
+		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
+	}
+}
+		
+namespace eval ::ap::plugins::Openttdcoop {
 	namespace path   ::ap::extends
 	namespace import ::ap::extends::utils::*
+	
+	var openttd_dl_url    {http://binaries.openttd.org/nightlies/trunk/%1$s/openttd-trunk-%1$s-%2$s.%3$s}
+	var openttd_server_ip {ps.openttdcoop.org}
 	
 	# init
 	proc init {} {
@@ -28,56 +38,85 @@ namespace eval ::ap::plugins::Openttdcoop {
 		
 		# irc commands
 		cmd::register irc     download  ${ns}::download
+		cmd::register irc     dl        ${ns}::download
+		cmd::register irc     ip        ${ns}::ip
 		
 		# console commands
 		cmd::register console download  ${ns}::download
+		cmd::register console dl        ${ns}::download
+		cmd::register console ip        ${ns}::ip
 		
 	}
 	
+	proc checkOpenTTD {} {
+		if {![::ap::apps::OpenTTD::isRunning]} {
+			say [who] [::msgcat::mc openttd_not_running]
+			return -level 2
+		}
+	}
 	
 	proc download {} {
+		# usage: %plugin% %cmd% <os version> [<openttd revision>]
 		# provide direct download links to the currently hosted openttd version
-		# + working test to detect nightly builds
-		# file: autopilot/scripts/irc/download.tcl
+		var openttd_dl_url
 		
-		set nightly false
-		# url style: http://binaries.openttd.org/nightlies/trunk/r14316/openttd-trunk-r14316-linux-generic-i686.tar.bz2
-		set url   {http://binaries.openttd.org/nightlies/trunk/%1$s/openttd-trunk-%1$s-%2$s.%3$s}
-		set sorry {Sorry, there exists no build for %2$s. Please compile it yoursel and if possible, share with others.}
-		
-		array set options {}
-		
-		# define possible download arguments in an array
-		set options(win64)     [format $url   $::ap::apps::OpenTTD::info(ottd_version) windows-win64           zip]
-		set options(win32)     [format $url   $::ap::apps::OpenTTD::info(ottd_version) windows-win32           zip]
-		set options(win9x)     [format $url   $::ap::apps::OpenTTD::info(ottd_version) windows-win9x           zip]
-		set options(lin)       [format $url   $::ap::apps::OpenTTD::info(ottd_version) linux-generic-i686      tar.bz2]
-		set options(lin64)     [format $url   $::ap::apps::OpenTTD::info(ottd_version) linux-generic-amd64     tar.bz2]
-		# set options(deb.etch)  [format $url   $::ap::apps::OpenTTD::info(ottd_version) linux-debian-etch-i386  deb]
-		# set options(deb.lenny) [format $url   $::ap::apps::OpenTTD::info(ottd_version) linux-debian-lenny-i386 deb]
-		set options(osx)       [format $url   $::ap::apps::OpenTTD::info(ottd_version) macosx-universal        zip]
-		# set options(morphos)   [format $sorry $::ap::apps::OpenTTD::info(ottd_version) morphos                 lha]
-		# set options(sun)       [format $sorry $::ap::apps::OpenTTD::info(ottd_version) sunos                   tar.bz2]
-		# set options(source)    [format $url   $::ap::apps::OpenTTD::info(ottd_version) source                  zip]
-		
-		set options(autoupdate) {http://www.openttdcoop.org/winupdater}
-		set options(autostart)  {http://www.openttdcoop.org/wiki/Autostart}
-		
-		# do the rest of the usage handling etc, based on the array
-		if {[numArgs] == 1} {
-			say [who] "[join [lsort [array names options]] {|}]"
-		} else {
-			if {[array names options -exact [getArg 1]] != {}} {
-				say [who] $options([getArg 1])
+		if {[info exists ::ap::apps::OpenTTD::info(ottd_version)]} {
+			if {$::ap::apps::OpenTTD::info(ottd_version) != {unknown}} {
+				set openttd_version $::ap::apps::OpenTTD::info(ottd_version)
 			} else {
-				say [who] "unknown option \"[getArg 1]\""
+				say [who] "Sorry. There is no version of OpenTTD defined."
+				return
 			}
+		} elseif {[numArgs] <= 1} {
+			say [who] "Sorry. There is no version of OpenTTD defined."
+			return
+		} else {
+			set openttd_version [getArg 1]
 		}
 		
+		array set options {}
+		# define possible download arguments in an array
+		set options(win64)     {windows-win64           zip}
+		set options(win32)     {windows-win32           zip}
+		set options(win9x)     {windows-win9x           zip}
+		set options(lin)       {linux-generic-i686      tar.bz2}
+		set options(lin64)     {linux-generic-amd64     tar.bz2}
+		set options(osx)       {macosx-universal        zip}
 		
+		set options(autoupdate) {http://www.openttdcoop.org/winupdater}
+		set options(autostart)  {http://wiki.openttdcoop.org/Autostart}
+		
+		# older/outdated options
+		# set options(deb.etch)  [format $url   $openttd_version linux-debian-etch-i386  deb]
+		# set options(deb.lenny) [format $url   $openttd_version linux-debian-lenny-i386 deb]
+		# set options(morphos)   [format $sorry $openttd_version morphos                 lha]
+		# set options(sun)       [format $sorry $openttd_version sunos                   tar.bz2]
+		# set options(source)    [format $url   $openttd_version source                  zip]
+		
+		# do the rest of the usage handling etc, based on the array
+		if {[numArgs] == 0} {
+			say [who] [::ap::func::listElements [array names options]]
+		} else {
+			if {[array names options -exact [getArg 0]] != {}} {
+				if {[llength $options([getArg 0])] == 1} {
+					say [who] $options([getArg 0])
+				} else {
+					say [who] [format $openttd_dl_url $openttd_version [lindex $options([getArg 0]) 0] [lindex $options([getArg 0]) 1]]
+				}
+			} else {
+				say [who] "Sorry. Unknown option \"[getArg 0]\"."
+			}
+		}
+	}
+	
+	proc ip {} {
+		# usage: %plugin% %cmd%
+		# returns the IP address of the OpenTTD Server
+		checkOpenTTD
+		var openttd_server_ip
+		say [who] "${openttd_server_ip}:[::ap::apps::OpenTTD::settings::get network.server_port]"
 	}
 	
 	
 	
-		
 }
