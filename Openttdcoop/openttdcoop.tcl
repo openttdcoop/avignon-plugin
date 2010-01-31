@@ -21,10 +21,15 @@ package provide AvignonPluginOpenttdcoop 0.1
 namespace eval ::ap::plugins::Openttdcoop {
 	::msgcat::mcmset {} {
 		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
-		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
 		
-		grf_version_file_not_found      {Error. The file containing the grfpack version was not found at '%s'.}
-		grf_version_unknown             {Sorry. The version of GrfPack used is unknown.}
+		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
+		openttd_version_not_defined     {Sorry. There is no version of OpenTTD defined.}
+		
+		grfpack_version_file_not_found  {Error. The file containing the grfpack version was not found at '%s'.}
+		grfpack_version_unknown             {Sorry. The version of GrfPack used is unknown.}
+		
+		cb_password_error               {The directory '%s' does not exists. Can not write passsword file.}
+		cmd_uptime_error                {Error. Command '%s' not found on this system.}
 	}
 }
 		
@@ -37,7 +42,8 @@ namespace eval ::ap::plugins::Openttdcoop {
 	var default_conf [dict create {*}{
 		{identifier}            {SERVER}
 		{short}                 {SERVER}
-		{pwkey}                 {PWKEY}
+		{pw.key}                {PWKEY}
+		{pw.path}               {./PATH/TO/DIR}
 		{irc_bot}               {BOT}
 		{openttd_server_ip}     {127.0.0.1}
 		{grf_version_file_path} {./PATH/TO/FILE/VERSION}
@@ -67,6 +73,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all transfer         ${ns}::transfer
 		cmd::register all uptime           ${ns}::uptime
 		
+		# register callbacks
+		cb::register CB_OTTD_ON_PW_CHANGE  ${ns}::cb_password_change
+		
 		# determine the GrfPack version
 		getGrfVersion
 	}
@@ -80,7 +89,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 	
 	proc getGrfVersion {} {
 		if {![file exists [::ap::config::get openttdcoop grf_version_file_path]]} {
-			::ap::log plugin error [::msgcat::mc grf_version_file_not_found [::ap::config::get openttdcoop grf_version_file_path]]
+			::ap::log plugin error [::msgcat::mc grfpack_version_file_not_found [::ap::config::get openttdcoop grf_version_file_path]]
 			var grf_version 0
 			return
 		}
@@ -97,11 +106,11 @@ namespace eval ::ap::plugins::Openttdcoop {
 			if {$::ap::apps::OpenTTD::info(ottd_version) != {unknown}} {
 				set openttd_version $::ap::apps::OpenTTD::info(ottd_version)
 			} else {
-				say [who] "Sorry. There is no version of OpenTTD defined."
+				say [who] [::msgcat::mc openttd_version_not_defined]
 				return
 			}
 		} elseif {[numArgs] <= 1} {
-			say [who] "Sorry. There is no version of OpenTTD defined."
+			say [who] [::msgcat::mc openttd_version_not_defined]
 			return
 		} else {
 			set openttd_version [getArg 1]
@@ -147,7 +156,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		# returns the version of #openttdcoop GrfPack used
 		var grf_version
 		if {$grf_version == 0} {
-			say [who] [::msgcat::mc grf_version_unknown]
+			say [who] [::msgcat::mc grfpack_version_unknown]
 		} else {
 			say [who] [format {http://www.openttdcoop.org/wiki/GRF (Version %1$s)} $grf_version]
 		}
@@ -159,6 +168,14 @@ namespace eval ::ap::plugins::Openttdcoop {
 		# returns the IP address of the OpenTTD Server
 		checkOpenTTD
 		say [who] "[::ap::config::get openttdcoop openttd_server_ip]:[::ap::apps::OpenTTD::settings::get network.server_port]"
+	}
+	
+	proc cb_password_change {} {
+		if {[file isdirectory] [::ap::config::get openttdcoop pw.path]} {
+			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
+		} else {
+			::ap::log plugin error [::msgcat::mc cb_password_error cb_password_error]
+		}
 	}
 	
 	proc server_status {} {
@@ -212,9 +229,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		checkPermission operator
 		
 		if {[numArgs] == 2} {
-			catch { exec ~/script/transfer.sh public [getArg 0] /home/openttd/website/public/save/[getArg 1] } data
+			catch { exec ~/script/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] /home/openttd/website/public/save/[getArg 1] } data
 		} elseif {[numArgs] == 3} {
-				catch { exec ~/script/transfer.sh public [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
+				catch { exec ~/script/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
 		} else {
 			say [who] {unknown parameter}
 			return
@@ -226,10 +243,10 @@ namespace eval ::ap::plugins::Openttdcoop {
 	proc uptime {} {
 		# usage: %plugin% %cmd%
 		# shows the uptime of the server and load averages
-		set cmd "uptime2"
+		set cmd "uptime"
 		if {[auto_execok $cmd] == {}} {
-			say [who] "Error.  '$cmd' not found on this system"
-			pluginErr {"Error.  '$cmd' not found on this system"}
+			say [who] [::msgcat::mc cmd_uptime_error $cmd]
+			return
 		} 
 		catch { exec $cmd } msg
 		say [who] $msg
