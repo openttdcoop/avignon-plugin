@@ -62,6 +62,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all grf              ${ns}::grf
 		cmd::register all ip               ${ns}::ip
 		cmd::register all server_status    ${ns}::server_status
+		cmd::register all setdef           ${ns}::setdef
 		cmd::register all time             ${ns}::time
 		cmd::register all transfer         ${ns}::transfer
 		cmd::register all uptime           ${ns}::uptime
@@ -173,6 +174,30 @@ namespace eval ::ap::plugins::Openttdcoop {
 		
 		catch { exec top -bcn1 -U openttd | grep ./openttd } msg
 		say [who] $msg
+	}
+	
+	proc setdef {} {
+		# usage: %plugin% %cmd%
+		# sets default values for the server
+		checkPermission operator
+		checkOpenTTD
+		
+		set openttd {::ap::apps::OpenTTD}
+		${openttd}::settings::set pf.wait_for_pbs_path 255
+		${openttd}::settings::set pf.wait_twoway_signal 255
+		${openttd}::settings::set pf.wait_oneway_signal 255
+		${openttd}::settings::set pf.path_backoff_interval 1
+		${openttd}::settings::set train_acceleration_model 1
+		${openttd}::settings::set extra_dynamite 1
+		${openttd}::settings::set mod_road_rebuild 1
+		${openttd}::settings::set forbid_90_deg 1
+		${openttd}::settings::set ai_in_multiplayer 0
+		${openttd}::settings::set order.no_servicing_if_no_breakdowns 1
+		if {[src] == console} {
+			${openttd}::msg::announce "*** Disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
+		} else {
+			${openttd}::msg::announce "*** [who] has disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
+		}
 	}
 	
 	proc time {} {
