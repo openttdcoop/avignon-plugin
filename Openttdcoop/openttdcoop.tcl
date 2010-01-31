@@ -18,13 +18,17 @@
 # Plugin to handle Debugging
 package provide AvignonPluginOpenttdcoop 0.1
 
+# We need the AvignonApplicationOpenTTD Plugin
+package require AvignonApplicationOpenTTD
+
 namespace eval ::ap::plugins::Openttdcoop {
 	::msgcat::mcmset {} {
-		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
+		critical_openttd_not_found      {Application OpenTTD was not found at '%s' forcing unload of [openttdcoop]}
 		
 		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
 		openttd_version_not_defined     {Sorry. There is no version of OpenTTD defined.}
 		
+		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
 		grfpack_version_file_not_found  {Error. The file containing the grfpack version was not found at '%s'.}
 		grfpack_version_unknown             {Sorry. The version of GrfPack used is unknown.}
 		
@@ -37,6 +41,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 	namespace path   ::ap::extends
 	namespace import ::ap::extends::utils::*
 	
+	var ottd_ns     {::ap::apps::OpenTTD2}
 	var grf_version
 	
 	var default_conf [dict create {*}{
@@ -54,6 +59,12 @@ namespace eval ::ap::plugins::Openttdcoop {
 	proc init {} {
 		variable ns [namespace current]
 		variable default_conf
+		variable ottd_ns
+		
+		# OpenTTD Plugin must be loaded, else this plugin doesn't make sense
+		if {![namespace exists $ottd_ns]} {
+			return -code error [::msgcat::mc critical_openttd_not_found $ottd_ns]
+		}
 		
 		# set default configuration
 		dict for {option value} $default_conf {
@@ -199,21 +210,21 @@ namespace eval ::ap::plugins::Openttdcoop {
 		checkPermission operator
 		checkOpenTTD
 		
-		set openttd {::ap::apps::OpenTTD}
-		${openttd}::settings::set pf.wait_for_pbs_path 255
-		${openttd}::settings::set pf.wait_twoway_signal 255
-		${openttd}::settings::set pf.wait_oneway_signal 255
-		${openttd}::settings::set pf.path_backoff_interval 1
-		${openttd}::settings::set train_acceleration_model 1
-		${openttd}::settings::set extra_dynamite 1
-		${openttd}::settings::set mod_road_rebuild 1
-		${openttd}::settings::set forbid_90_deg 1
-		${openttd}::settings::set ai_in_multiplayer 0
-		${openttd}::settings::set order.no_servicing_if_no_breakdowns 1
+		var ottd_ns
+		${ottd_ns}::settings::set pf.wait_for_pbs_path 255
+		${ottd_ns}::settings::set pf.wait_twoway_signal 255
+		${ottd_ns}::settings::set pf.wait_oneway_signal 255
+		${ottd_ns}::settings::set pf.path_backoff_interval 1
+		${ottd_ns}::settings::set train_acceleration_model 1
+		${ottd_ns}::settings::set extra_dynamite 1
+		${ottd_ns}::settings::set mod_road_rebuild 1
+		${ottd_ns}::settings::set forbid_90_deg 1
+		${ottd_ns}::settings::set ai_in_multiplayer 0
+		${ottd_ns}::settings::set order.no_servicing_if_no_breakdowns 1
 		if {[src] == console} {
-			${openttd}::msg::announce "*** Disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
+			${ottd_ns}::msg::announce "*** Disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
 		} else {
-			${openttd}::msg::announce "*** [who] has disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
+			${ottd_ns}::msg::announce "*** [who] has disabled wait_for_pbs_path, wait_twoway_signal, wait_oneway_signal, ai_in_multiplayer enabled no_servicing_if_no_breakdowns, extra_dynamite, mod_road_rebuild, forbid_90_deg and set path_backoff_interval to 1, train_acceleration_model to 1"
 		}
 	}
 	
