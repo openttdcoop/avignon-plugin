@@ -171,7 +171,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 	}
 	
 	proc cb_password_change {} {
-		if {[file isdirectory] [::ap::config::get openttdcoop pw.path]} {
+		if {[file isdirectory [::ap::config::get openttdcoop pw.path]]} {
 			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
 		} else {
 			::ap::log plugin error [::msgcat::mc cb_password_error cb_password_error]
@@ -233,7 +233,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		} elseif {[numArgs] == 3} {
 				catch { exec ~/script/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
 		} else {
-			say [who] {unknown parameter}
+			say [who] [pluginHelp]
 			return
 		}
 		
