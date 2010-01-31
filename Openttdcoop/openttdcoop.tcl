@@ -22,6 +22,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 	::msgcat::mcmset {} {
 		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
 		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
+		
+		grf_version_file_not_found      {Error. The file containing the grfpack version was not found at '%s'.}
+		grf_version_unknown             {Sorry. The version of GrfPack used is unknown.}
 	}
 }
 		
@@ -29,21 +32,42 @@ namespace eval ::ap::plugins::Openttdcoop {
 	namespace path   ::ap::extends
 	namespace import ::ap::extends::utils::*
 	
-	var openttd_dl_url    {http://binaries.openttd.org/nightlies/trunk/%1$s/openttd-trunk-%1$s-%2$s.%3$s}
-	var openttd_server_ip {ps.openttdcoop.org}
+	var grf_version
+	
+	var default_conf [dict create {*}{
+		{identifier}            {SERVER}
+		{short}                 {SERVER}
+		{pwkey}                 {PWKEY}
+		{irc_bot}               {BOT}
+		{openttd_server_ip}     {127.0.0.1}
+		{grf_version_file_path} {./PATH/TO/FILE/VERSION}
+		{openttd_dl_url}        {http://binaries.openttd.org/nightlies/trunk/%1$s/openttd-trunk-%1$s-%2$s.%3$s}
+	}]
 	
 	# init
 	proc init {} {
 		variable ns [namespace current]
+		variable default_conf
+		
+		# set default configuration
+		dict for {option value} $default_conf {
+			if {![::ap::config::exists openttdcoop $option]} {
+				::ap::config::set openttdcoop $option $value
+			}
+		}
 		
 		# irc + console commands
 		cmd::register all download         ${ns}::download
 		cmd::register all dl               ${ns}::download
+		cmd::register all grf              ${ns}::grf
 		cmd::register all ip               ${ns}::ip
 		cmd::register all server_status    ${ns}::server_status
 		cmd::register all time             ${ns}::time
+		cmd::register all transfer         ${ns}::transfer
 		cmd::register all uptime           ${ns}::uptime
 		
+		# determine the GrfPack version
+		getGrfVersion
 	}
 	
 	proc checkOpenTTD {} {
@@ -53,11 +77,21 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
+	proc getGrfVersion {} {
+		if {![file exists [::ap::config::get openttdcoop grf_version_file_path]]} {
+			::ap::log plugin error [::msgcat::mc grf_version_file_not_found [::ap::config::get openttdcoop grf_version_file_path]]
+			var grf_version 0
+			return
+		}
+		set grfVersionFile [open ./data/ottdc_grfpack/VERSION r]
+		gets $grfVersionFile grfVersion
+		close $grfVersionFile
+		var grf_version $grfVersion
+	}
+	
 	proc download {} {
 		# usage: %plugin% %cmd% <os version> [<openttd revision>]
 		# provide direct download links to the currently hosted openttd version
-		var openttd_dl_url
-		
 		if {[info exists ::ap::apps::OpenTTD::info(ottd_version)]} {
 			if {$::ap::apps::OpenTTD::info(ottd_version) != {unknown}} {
 				set openttd_version $::ap::apps::OpenTTD::info(ottd_version)
@@ -99,7 +133,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 				if {[llength $options([getArg 0])] == 1} {
 					say [who] $options([getArg 0])
 				} else {
-					say [who] [format $openttd_dl_url $openttd_version [lindex $options([getArg 0]) 0] [lindex $options([getArg 0]) 1]]
+					say [who] [format [::ap::config::get openttdcoop openttd_dl_url] $openttd_version [lindex $options([getArg 0]) 0] [lindex $options([getArg 0]) 1]]
 				}
 			} else {
 				say [who] "Sorry. Unknown option \"[getArg 0]\"."
@@ -107,12 +141,23 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
+	proc grf {} {
+		# usage: %plugin% %cmd%
+		# returns the version of #openttdcoop GrfPack used
+		var grf_version
+		if {$grf_version == 0} {
+			say [who] [::msgcat::mc grf_version_unknown]
+		} else {
+			say [who] [format {http://www.openttdcoop.org/wiki/GRF (Version %1$s)} $grf_version]
+		}
+		
+	}
+	
 	proc ip {} {
 		# usage: %plugin% %cmd%
 		# returns the IP address of the OpenTTD Server
 		checkOpenTTD
-		var openttd_server_ip
-		say [who] "${openttd_server_ip}:[::ap::apps::OpenTTD::settings::get network.server_port]"
+		say [who] "[::ap::config::get openttdcoop openttd_server_ip]:[::ap::apps::OpenTTD::settings::get network.server_port]"
 	}
 	
 	proc server_status {} {
@@ -134,6 +179,23 @@ namespace eval ::ap::plugins::Openttdcoop {
 		# usage: %plugin% %cmd%
 		# returns the time of Europe and United States
 		say [who] "EU: [clock format [clock seconds] -format {%R (%Z)}] / US: [clock format [clock seconds] -timezone :America/New_York -format {%R (%Z)}]"
+	}
+	
+	proc transfer {} {
+		# usage: %plugin% %cmd% <game number> [-f] <savegame>
+		# transfer the savegame to the webserver for archiving the game 
+		checkPermission operator
+		
+		if {[numArgs] == 2} {
+			catch { exec ~/script/transfer.sh public [getArg 0] /home/openttd/website/public/save/[getArg 1] } data
+		} elseif {[numArgs] == 3} {
+				catch { exec ~/script/transfer.sh public [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
+		} else {
+			say [who] {unknown parameter}
+			return
+		}
+		
+		say [who] $data
 	}
 	
 	proc uptime {} {
