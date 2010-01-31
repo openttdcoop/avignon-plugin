@@ -41,7 +41,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 	namespace path   ::ap::extends
 	namespace import ::ap::extends::utils::*
 	
-	var ottd_ns     {::ap::apps::OpenTTD2}
+	var ottd_ns     {::ap::apps::OpenTTD}
 	var grf_version
 	
 	var default_conf [dict create {*}{
