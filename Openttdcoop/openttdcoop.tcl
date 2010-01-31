@@ -36,15 +36,13 @@ namespace eval ::ap::plugins::Openttdcoop {
 	proc init {} {
 		variable ns [namespace current]
 		
-		# irc commands
-		cmd::register irc     download  ${ns}::download
-		cmd::register irc     dl        ${ns}::download
-		cmd::register irc     ip        ${ns}::ip
-		
-		# console commands
-		cmd::register console download  ${ns}::download
-		cmd::register console dl        ${ns}::download
-		cmd::register console ip        ${ns}::ip
+		# irc + console commands
+		cmd::register all download         ${ns}::download
+		cmd::register all dl               ${ns}::download
+		cmd::register all ip               ${ns}::ip
+		cmd::register all server_status    ${ns}::server_status
+		cmd::register all time             ${ns}::time
+		cmd::register all uptime           ${ns}::uptime
 		
 	}
 	
@@ -117,6 +115,37 @@ namespace eval ::ap::plugins::Openttdcoop {
 		say [who] "${openttd_server_ip}:[::ap::apps::OpenTTD::settings::get network.server_port]"
 	}
 	
+	proc server_status {} {
+		# usage: %plugin% %cmd%
+		# shows the status of the server
+		checkPermission operator
+		
+		catch { exec uptime } msg
+		say [who] $msg
+		
+		catch { exec top -bcn1 -U openttd | grep Cpu } msg
+		say [who] $msg
+		
+		catch { exec top -bcn1 -U openttd | grep ./openttd } msg
+		say [who] $msg
+	}
 	
+	proc time {} {
+		# usage: %plugin% %cmd%
+		# returns the time of Europe and United States
+		say [who] "EU: [clock format [clock seconds] -format {%R (%Z)}] / US: [clock format [clock seconds] -timezone :America/New_York -format {%R (%Z)}]"
+	}
+	
+	proc uptime {} {
+		# usage: %plugin% %cmd%
+		# shows the uptime of the server and load averages
+		set cmd "uptime2"
+		if {[auto_execok $cmd] == {}} {
+			say [who] "Error.  '$cmd' not found on this system"
+			pluginErr {"Error.  '$cmd' not found on this system"}
+		} 
+		catch { exec $cmd } msg
+		say [who] $msg
+	}
 	
 }
