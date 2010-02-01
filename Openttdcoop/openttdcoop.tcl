@@ -28,9 +28,13 @@ namespace eval ::ap::plugins::Openttdcoop {
 		openttd_not_running             {Sorry. Can not issue command. OpenTTD Server is not running.}
 		openttd_version_not_defined     {Sorry. There is no version of OpenTTD defined.}
 		
+		cmd_error                       {Sorry. Can't issue screenshot cmd}
+		screenshot_error_path           {The directory '%s' does not exists.}
+		screenshot_msg                  {*** %1$s made a screenshot at %2$s: %3$s/%2$s.png}
+		
 		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
 		grfpack_version_file_not_found  {Error. The file containing the grfpack version was not found at '%s'.}
-		grfpack_version_unknown             {Sorry. The version of GrfPack used is unknown.}
+		grfpack_version_unknown         {Sorry. The version of GrfPack used is unknown.}
 		
 		cb_password_error               {The directory '%s' does not exists. Can not write passsword file.}
 		cmd_uptime_error                {Error. Command '%s' not found on this system.}
@@ -53,6 +57,8 @@ namespace eval ::ap::plugins::Openttdcoop {
 		{openttd_server_ip}     {127.0.0.1}
 		{grf_version_file_path} {./PATH/TO/FILE/VERSION}
 		{openttd_dl_url}        {http://binaries.openttd.org/nightlies/trunk/%1$s/openttd-trunk-%1$s-%2$s.%3$s}
+		{screenshot_path}       {./PATH/TO/DIR}
+		{screenshot_uri}        {http://www.domain.com/webcam}
 	}]
 	
 	# init
@@ -78,6 +84,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all dl               ${ns}::download
 		cmd::register all grf              ${ns}::grf
 		cmd::register all ip               ${ns}::ip
+		cmd::register all screenshot       ${ns}::screenshot
 		cmd::register all server_status    ${ns}::server_status
 		cmd::register all setdef           ${ns}::setdef
 		cmd::register all time             ${ns}::time
@@ -185,7 +192,37 @@ namespace eval ::ap::plugins::Openttdcoop {
 		if {[file isdirectory [::ap::config::get openttdcoop pw.path]]} {
 			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
 		} else {
-			::ap::log plugin error [::msgcat::mc cb_password_error cb_password_error]
+			::ap::log plugin error [::msgcat::mc cb_password_error [::ap::config::get openttdcoop pw.path]]
+		}
+	}
+	
+	proc screenshot {} {
+		var ottd_ns
+		checkOpenTTD
+		
+		if {![file isdirectory [::ap::config::get openttdcoop screenshot_path]]} {
+			say [who] [::msgcat::mc cmd_error]
+			pluginErr [::msgcat::mc screenshot_error_path [::ap::config::get openttdcoop screenshot_path]]
+		}
+		
+		if {![info exists [expr $${ottd_ns}::info(last_action_location)]] || [expr $${ottd_ns}::info(last_action_location)] != [expr $${ottd_ns}::info(last_screen_location)]} {
+			# scrollto location
+			${ottd_ns}::send "scrollto 0x[expr $${ottd_ns}::info(last_action_location)]"
+			# update the pointer
+			set ${ottd_ns}::info(last_screen_location) [expr $${ottd_ns}::info(last_action_location)]
+			# and create new screenshot
+			${ottd_ns}::send "screenshot no_con screenshot"
+			
+			# the neccessary directories
+			set latest_path [file normalize "[::ap::config::get openttdcoop screenshot_path]/[expr $${ottd_ns}::info(last_action_location)].png"]
+			set link_path   [file normalize "[::ap::config::get openttdcoop screenshot_path]/screenshot.png"]
+			
+			# copy file to webdir and create symlink
+			file rename -force "[file dirname [::ap::config::get openttd app.path]]/screenshot.png" $latest_path
+			exec ln -fs $latest_path $link_path
+			
+			# return the screenshot url
+			${ottd_ns}::msg::announce [::msgcat::mc screenshot_msg [who] [expr $${ottd_ns}::info(last_action_location)] [::ap::config::get openttdcoop screenshot_uri]]
 		}
 	}
 	
