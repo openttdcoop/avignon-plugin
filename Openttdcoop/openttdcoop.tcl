@@ -118,21 +118,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 	}
 	
 	proc download {} {
-		# usage: %plugin% %cmd% <os version> [<openttd revision>]
-		# provide direct download links to the currently hosted openttd version
-		if {[info exists ::ap::apps::OpenTTD::info(ottd_version)]} {
-			if {$::ap::apps::OpenTTD::info(ottd_version) != {unknown}} {
-				set openttd_version $::ap::apps::OpenTTD::info(ottd_version)
-			} else {
-				say [who] [::msgcat::mc openttd_version_not_defined]
-				return
-			}
-		} elseif {[numArgs] <= 1} {
-			say [who] [::msgcat::mc openttd_version_not_defined]
-			return
-		} else {
-			set openttd_version [getArg 1]
-		}
+		# Usage: %plugin% %cmd% <os version> [<openttd revision>]
+		# Provide direct download links to the currently hosted openttd version.
+		# Omit all parameters to list all download options.
 		
 		array set options {}
 		# define possible download arguments in an array
@@ -141,7 +129,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		set options(win9x)     {windows-win9x           zip}
 		set options(lin)       {linux-generic-i686      tar.bz2}
 		set options(lin64)     {linux-generic-amd64     tar.bz2}
-		set options(osx)       {macosx-universal        zip}
+		set options(source)    {source                  zip}
 		
 		set options(autoupdate) {http://www.openttdcoop.org/winupdater}
 		set options(autostart)  {http://wiki.openttdcoop.org/Autostart}
@@ -151,21 +139,42 @@ namespace eval ::ap::plugins::Openttdcoop {
 		# set options(deb.lenny) [format $url   $openttd_version linux-debian-lenny-i386 deb]
 		# set options(morphos)   [format $sorry $openttd_version morphos                 lha]
 		# set options(sun)       [format $sorry $openttd_version sunos                   tar.bz2]
-		# set options(source)    [format $url   $openttd_version source                  zip]
+		# set options(osx)       {macosx-universal        zip}
+		
+		switch [numArgs] {
+			0 {
+				say [who] [::ap::func::listElements [array names options]]
+				return
+			}
+			1 {
+				if {![info exists ::ap::apps::OpenTTD::info(ottd_version)]} {
+					say [who] [::msgcat::mc openttd_version_not_defined]
+					return
+				} elseif {$::ap::apps::OpenTTD::info(ottd_version) == {unknown}} {
+					say [who] [::msgcat::mc openttd_version_not_defined]
+					return
+				}
+				set openttd_version $::ap::apps::OpenTTD::info(ottd_version)
+			}
+			2 {
+				if {[string match {r[0-9]*} [getArg 1]]} {
+					set openttd_version [getArg 1]
+				} else {
+					say [who] [::msgcat::mc openttd_version_not_defined]
+					return
+				}
+			}
+		}
 		
 		# do the rest of the usage handling etc, based on the array
-		if {[numArgs] == 0} {
-			say [who] [::ap::func::listElements [array names options]]
-		} else {
-			if {[array names options -exact [getArg 0]] != {}} {
-				if {[llength $options([getArg 0])] == 1} {
-					say [who] $options([getArg 0])
-				} else {
-					say [who] [format [::ap::config::get openttdcoop openttd_dl_url] $openttd_version [lindex $options([getArg 0]) 0] [lindex $options([getArg 0]) 1]]
-				}
+		if {[array names options -exact [getArg 0]] != {}} {
+			if {[llength $options([getArg 0])] == 1} {
+				say [who] $options([getArg 0])
 			} else {
-				say [who] "Sorry. Unknown option \"[getArg 0]\"."
+				say [who] [format [::ap::config::get openttdcoop openttd_dl_url] $openttd_version [lindex $options([getArg 0]) 0] [lindex $options([getArg 0]) 1]]
 			}
+		} else {
+			say [who] "Sorry. Unknown option \"[getArg 0]\"."
 		}
 	}
 	
