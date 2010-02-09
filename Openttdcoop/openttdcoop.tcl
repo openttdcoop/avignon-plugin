@@ -84,6 +84,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all dl               ${ns}::download
 		cmd::register all grf              ${ns}::grf
 		cmd::register all ip               ${ns}::ip
+		cmd::register all info             ${ns}::cmd-info
 		cmd::register all screenshot       ${ns}::screenshot
 		cmd::register all server_status    ${ns}::server_status
 		cmd::register all setdef           ${ns}::setdef
@@ -188,6 +189,24 @@ namespace eval ::ap::plugins::Openttdcoop {
 			say [who] [format {http://www.openttdcoop.org/wiki/GRF (Version %1$s)} $grf_version]
 		}
 		
+	}
+	
+	proc cmd-info {} {
+		checkOpenTTD
+		var ottd_ns
+		
+		set result [${ottd_ns}::utils::sendConsoleCmd "companies"]
+		if {[lindex $result 0]} {
+			set data [lindex $result 1]
+			if {[llength $data] > 1} {
+				foreach line  {
+					append output $line \n
+				}
+			} else {
+				set output [lindex $data 0]
+			}
+			say [who] $output
+		}
 	}
 	
 	proc ip {} {
