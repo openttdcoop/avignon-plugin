@@ -286,9 +286,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		checkPermission operator
 		
 		if {[numArgs] == 2} {
-			catch { exec ~/script/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] /home/openttd/website/public/save/[getArg 1] } data
+			catch { exec ./extensions/plugins/Openttdcoop/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] /home/openttd/website/public/save/[getArg 1] } data
 		} elseif {[numArgs] == 3} {
-				catch { exec ~/script/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
+				catch { exec ./extensions/plugins/Openttdcoop/transfer.sh [::ap::config::get openttdcoop identifier] [getArg 0] [getArg 1] /home/openttd/website/public/save/[getArg 2] } data
 		} else {
 			say [who] [pluginHelp]
 			return
