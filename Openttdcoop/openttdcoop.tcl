@@ -45,9 +45,11 @@ namespace eval ::ap::plugins::Openttdcoop {
 	namespace path   ::ap::extends
 	namespace import ::ap::extends::utils::*
 	
+	# set some default variables
 	var ottd_ns     {::ap::apps::OpenTTD}
 	var grf_version
 	
+	# set the default configuration
 	var default_conf [dict create {*}{
 		{identifier}            {SERVER}
 		{short}                 {SERVER}
@@ -61,7 +63,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		{screenshot_uri}        {http://www.domain.com/webcam}
 	}]
 	
-	# init
+	################################
+	# Initialisation of the plugin #
+	################################
 	proc init {} {
 		variable ns [namespace current]
 		variable default_conf
@@ -80,17 +84,17 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 		
 		# irc + console commands
-		cmd::register all download         ${ns}::download
-		cmd::register all dl               ${ns}::download
-		cmd::register all grf              ${ns}::grf
-		cmd::register all ip               ${ns}::ip
+		cmd::register all download         ${ns}::cmd-download
+		cmd::register all dl               ${ns}::cmd-download
+		cmd::register all grf              ${ns}::cmd-grf
+		cmd::register all ip               ${ns}::cmd-ip
 		cmd::register all info             ${ns}::cmd-info
-		cmd::register all screenshot       ${ns}::screenshot
-		cmd::register all server_status    ${ns}::server_status
-		cmd::register all setdef           ${ns}::setdef
-		cmd::register all time             ${ns}::time
-		cmd::register all transfer         ${ns}::transfer
-		cmd::register all uptime           ${ns}::uptime
+		cmd::register all screenshot       ${ns}::cmd-screenshot
+		cmd::register all server_status    ${ns}::cmd-server_status
+		cmd::register all setdef           ${ns}::cmd-setdef
+		cmd::register all time             ${ns}::cmd-time
+		cmd::register all transfer         ${ns}::cmd-transfer
+		cmd::register all uptime           ${ns}::cmd-uptime
 		
 		# register callbacks
 		cb::register CB_OTTD_ON_PW_CHANGE  ${ns}::cb_password_change
@@ -99,6 +103,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		getGrfVersion
 	}
 	
+	###############################################
+	# Useful functions required often in commands #
+	###############################################
 	proc checkOpenTTD {} {
 		if {![::ap::apps::OpenTTD::isRunning]} {
 			say [who] [::msgcat::mc openttd_not_running]
@@ -118,7 +125,10 @@ namespace eval ::ap::plugins::Openttdcoop {
 		var grf_version $grfVersion
 	}
 	
-	proc download {} {
+	###################################################
+	# All Commands of this plugin (with prefix 'cmd-' #
+	###################################################
+	proc cmd-download {} {
 		# Usage: %plugin% %cmd% <os version> [<openttd revision>]
 		# Provide direct download links to the currently hosted openttd version.
 		# Omit all parameters to list all download options.
@@ -179,7 +189,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
-	proc grf {} {
+	proc cmd-grf {} {
 		# usage: %plugin% %cmd%
 		# returns the version of #openttdcoop GrfPack used
 		var grf_version
@@ -209,22 +219,14 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
-	proc ip {} {
+	proc cmd-ip {} {
 		# usage: %plugin% %cmd%
 		# returns the IP address of the OpenTTD Server
 		checkOpenTTD
 		say [who] "[::ap::config::get openttdcoop openttd_server_ip]:[::ap::apps::OpenTTD::settings::get network.server_port]"
 	}
 	
-	proc cb_password_change {} {
-		if {[file isdirectory [::ap::config::get openttdcoop pw.path]]} {
-			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
-		} else {
-			::ap::log plugin error [::msgcat::mc cb_password_error [::ap::config::get openttdcoop pw.path]]
-		}
-	}
-	
-	proc screenshot {} {
+	proc cmd-screenshot {} {
 		var ottd_ns
 		checkOpenTTD
 		
@@ -254,7 +256,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
-	proc server_status {} {
+	proc cmd-server_status {} {
 		# usage: %plugin% %cmd%
 		# shows the status of the server
 		checkPermission operator
@@ -269,7 +271,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		say [who] $msg
 	}
 	
-	proc setdef {} {
+	proc cmd-setdef {} {
 		# usage: %plugin% %cmd%
 		# sets default values for the server
 		checkPermission operator
@@ -293,13 +295,13 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 	}
 	
-	proc time {} {
+	proc cmd-time {} {
 		# usage: %plugin% %cmd%
 		# returns the time of Europe and United States
 		say [who] "EU: [clock format [clock seconds] -format {%R (%Z)}] / US: [clock format [clock seconds] -timezone :America/New_York -format {%R (%Z)}]"
 	}
 	
-	proc transfer {} {
+	proc cmd-transfer {} {
 		# usage: %plugin% %cmd% <game number> [-f] <savegame>
 		# transfer the savegame to the webserver for archiving the game 
 		checkPermission operator
@@ -316,7 +318,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		say [who] $data
 	}
 	
-	proc uptime {} {
+	proc cmd-uptime {} {
 		# usage: %plugin% %cmd%
 		# shows the uptime of the server and load averages
 		set cmd "uptime"
@@ -326,6 +328,17 @@ namespace eval ::ap::plugins::Openttdcoop {
 		} 
 		catch { exec $cmd } msg
 		say [who] $msg
+	}
+	
+	####################################################
+	# All Callbacks of this plugin (with prefix 'cmd-' #
+	####################################################
+	proc cb_password_change {} {
+		if {[file isdirectory [::ap::config::get openttdcoop pw.path]]} {
+			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
+		} else {
+			::ap::log plugin error [::msgcat::mc cb_password_error [::ap::config::get openttdcoop pw.path]]
+		}
 	}
 	
 }
