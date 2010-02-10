@@ -99,7 +99,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all uptime           ${ns}::cmd-uptime
 		
 		# register callbacks
-		cb::register CB_OTTD_ON_PW_CHANGE  ${ns}::cb_password_change
+		cb::register CB_OTTD_ON_PW_CHANGE  ${ns}::cb-password_change
 		
 		# determine the GrfPack version
 		getGrfVersion
@@ -349,10 +349,10 @@ namespace eval ::ap::plugins::Openttdcoop {
 		say [who] $msg
 	}
 	
-	####################################################
-	# All Callbacks of this plugin (with prefix 'cmd-' #
-	####################################################
-	proc cb_password_change {} {
+	###################################################
+	# All Callbacks of this plugin (with prefix 'cb-' #
+	###################################################
+	proc cb-password_change {} {
 		if {[file isdirectory [::ap::config::get openttdcoop pw.path]]} {
 			exec echo [::ap::apps::OpenTTD::settings::get "network.server_password"] > [::ap::config::get openttdcoop pw.path]/[::ap::config::get openttdcoop pw.key]
 		} else {
