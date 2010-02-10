@@ -31,6 +31,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd_error                       {Sorry. Can't issue screenshot cmd}
 		screenshot_error_path           {The directory '%s' does not exists.}
 		screenshot_msg                  {*** %1$s made a screenshot at %2$s: %3$s/%2$s.png}
+		cmd_date_msg                    {Current game date: %s}
 		
 		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
 		grfpack_version_file_not_found  {Error. The file containing the grfpack version was not found at '%s'.}
@@ -84,6 +85,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 		
 		# irc + console commands
+		cmd::register all date             ${ns}::cmd-date
 		cmd::register all download         ${ns}::cmd-download
 		cmd::register all dl               ${ns}::cmd-download
 		cmd::register all grf              ${ns}::cmd-grf
@@ -128,6 +130,21 @@ namespace eval ::ap::plugins::Openttdcoop {
 	###################################################
 	# All Commands of this plugin (with prefix 'cmd-' #
 	###################################################
+	proc cmd-date {} {
+		# Usage: %plugin% %cmd%
+		# Returns the date of the current game
+		checkOpenTTD
+		var ottd_ns
+		
+		set result [${ottd_ns}::utils::sendConsoleCmd "getdate"]
+		if {[lindex $result 0]} {
+			set date [join [lindex $result 1]]
+			scan $date "Date: %d-%d-%d" day month year
+			
+			say [who] [::msgcat::mc cmd_date_msg [clock format [clock scan "$month/$day/2000"] -format "%e %b $year"]]
+		}
+	}
+	
 	proc cmd-download {} {
 		# Usage: %plugin% %cmd% <os version> [<openttd revision>]
 		# Provide direct download links to the currently hosted openttd version.
@@ -216,6 +233,8 @@ namespace eval ::ap::plugins::Openttdcoop {
 				set output [lindex $data 0]
 			}
 			say [who] $output
+		} else {
+			pluginErr
 		}
 	}
 	
