@@ -32,6 +32,7 @@ namespace eval ::ap::plugins::Openttdcoop {
 		screenshot_error_path           {The directory '%s' does not exists.}
 		screenshot_msg                  {*** %1$s made a screenshot at %2$s: %3$s/%2$s.png}
 		cmd_date_msg                    {Current game date: %s}
+		cmd_trains_msg                  {*** %s has set max_trains to %s}
 		
 		download_no_valid_build         {Sorry, there doesn't exist a build for %2$s. Please compile it yourself and share with others, if possible.}
 		grfpack_version_file_not_found  {Error. The file containing the grfpack version was not found at '%s'.}
@@ -95,7 +96,9 @@ namespace eval ::ap::plugins::Openttdcoop {
 		cmd::register all server_status    ${ns}::cmd-server_status
 		cmd::register all setdef           ${ns}::cmd-setdef
 		cmd::register all time             ${ns}::cmd-time
+		cmd::register all trains           ${ns}::cmd-trains
 		cmd::register all transfer         ${ns}::cmd-transfer
+		cmd::register all tunnels          ${ns}::cmd-tunnels
 		cmd::register all uptime           ${ns}::cmd-uptime
 		
 		# register callbacks
@@ -320,6 +323,21 @@ namespace eval ::ap::plugins::Openttdcoop {
 		say [who] "EU: [clock format [clock seconds] -format {%R (%Z)}] / US: [clock format [clock seconds] -timezone :America/New_York -format {%R (%Z)}]"
 	}
 	
+	proc cmd-trains {} {
+		# usage: %plugin% %cmd% <integer>
+		# Set the limit of maximum trains allowed in the game
+		checkPermission operator
+		checkOpenTTD
+		var ottd_ns
+		
+		if {[numArgs] == 1 && [string is integer [getArg 1]]} {
+			${ottd_ns}::settings::set max_trains [getArg 0]
+			${ottd_ns}::msg::announce [::msgcat::mc cmd_trains_msg [who] [getArg 0]]
+		} else {
+			pluginHelp
+		}
+	}
+	
 	proc cmd-transfer {} {
 		# usage: %plugin% %cmd% <game number> [-f] <savegame>
 		# transfer the savegame to the webserver for archiving the game 
@@ -335,6 +353,20 @@ namespace eval ::ap::plugins::Openttdcoop {
 		}
 		
 		say [who] $data
+	}
+	
+	proc cmd-tunnels {} {
+		# usage: %plugin% %cmd% <trainlength> <gap>
+		# Returns the number of tunnels / bridges required for a longer signal gape /split
+		# Formula: <number of tunnels/bridges> = (<gap>+<trainlength>-2)/(<trainlength>+2)
+		if {[numArgs] == 2 && [string is integer [getArg 0]] && [string is integer [getArg 1]]} {
+			set train [getArg 0]
+			set gap [getArg 1]
+			set a1 [expr ( int(ceil(( $gap + $train - 2 ) / ( $train. + 2 ))))]
+			say [who] "You need [expr { $a1<2?2:$a1 } ] tunnels/bridges for trainlength $train and gap $gap."
+		} else {
+			pluginHelp
+		}
 	}
 	
 	proc cmd-uptime {} {
